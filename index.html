@@ -407,8 +407,8 @@
                 lastAction: `Room created by ${name}`
             };
 
-            // Use public data path
-            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${roomCode}`);
+            // FIX: Added 'poker_rooms' collection level to ensure even segments for doc path (6 segments)
+            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'poker_rooms', `poker_room_${roomCode}`);
             
             try {
                 await setDoc(gameRef, initialState);
@@ -432,7 +432,8 @@
             if (code.length !== 6) return setStatus("Invalid room code");
             if (!userId) return setStatus("Connecting to network...");
 
-            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${code}`);
+            // FIX: Updated path to include 'poker_rooms'
+            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'poker_rooms', `poker_room_${code}`);
             
             try {
                 const docSnap = await getDoc(gameRef);
@@ -479,7 +480,8 @@
 
         const subscribeToGame = (code) => {
             if (unsubscribeGame) unsubscribeGame();
-            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${code}`);
+            // FIX: Updated path to include 'poker_rooms'
+            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'poker_rooms', `poker_room_${code}`);
             
             unsubscribeGame = onSnapshot(gameRef, (doc) => {
                 if (doc.exists()) {
@@ -532,7 +534,8 @@
                 lastAction: "Game Started!"
             };
 
-            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${currentGameId}`);
+            // FIX: Updated path to include 'poker_rooms'
+            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'poker_rooms', `poker_room_${currentGameId}`);
             await updateDoc(gameRef, updates);
         };
 
@@ -731,7 +734,8 @@
             // Ideally Host handles "Stage Change", but client updates "Turn". 
             // We just update DB with turn change. Host watchdog will trigger stage change.
             
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${currentGameId}`), {
+            // FIX: Updated path to include 'poker_rooms'
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'poker_rooms', `poker_room_${currentGameId}`), {
                 players: gameState.players,
                 pot: gameState.pot,
                 currentBet: gameState.currentBet,
@@ -793,7 +797,8 @@
                 const players = [...gameState.players];
                 players.forEach(p => p.bet = 0);
 
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${currentGameId}`), {
+                // FIX: Updated path to include 'poker_rooms'
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'poker_rooms', `poker_room_${currentGameId}`), {
                     stage: nextStage,
                     communityCards: [...gameState.communityCards, ...newCards],
                     deck: deck,
@@ -826,7 +831,8 @@
             const winIndex = players.findIndex(p => p.id === winner.id);
             players[winIndex].chips += gameState.pot;
             
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${currentGameId}`), {
+            // FIX: Updated path to include 'poker_rooms'
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'poker_rooms', `poker_room_${currentGameId}`), {
                 stage: 'showdown',
                 players: players,
                 pot: 0,
@@ -859,7 +865,8 @@
                 }
             });
 
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${currentGameId}`), {
+            // FIX: Updated path to include 'poker_rooms'
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'poker_rooms', `poker_room_${currentGameId}`), {
                 stage: 'preflop',
                 status: 'playing',
                 communityCards: [],
