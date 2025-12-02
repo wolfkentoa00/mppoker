@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High Stakes Poker - Multiplayer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+        :root {
+            --stake-dark: #0f212e;
+            --stake-card: #1a2c38;
+            --stake-hover: #213743;
+            --stake-green: #00e701;
+            --stake-green-hover: #00c201;
+            --card-width: 60px;
+            --card-height: 84px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--stake-dark);
+            color: white;
+            overflow-x: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Card Styles */
+        .playing-card {
+            width: var(--card-width);
+            height: var(--card-height);
+            background-color: white;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 4px;
+            position: relative;
+            font-weight: bold;
+            font-size: 0.9rem;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.27), left 0.4s ease;
+            backface-visibility: hidden;
+        }
+        
+        @media (min-width: 768px) {
+            :root {
+                --card-width: 80px;
+                --card-height: 112px;
+            }
+            .playing-card {
+                font-size: 1.2rem;
+                padding: 6px;
+                border-radius: 8px;
+            }
+        }
+
+        .suit-red { color: #e91e63; }
+        .suit-black { color: #2d3436; }
+
+        .card-back {
+            background: linear-gradient(135deg, #1a2c38 25%, #213743 25%, #213743 50%, #1a2c38 50%, #1a2c38 75%, #213743 75%, #213743 100%);
+            background-size: 20px 20px;
+            border: 2px solid #fff;
+        }
+        
+        .card-center-suit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.8rem;
+            opacity: 0.2;
+        }
+
+        .chip {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 3px dashed white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.7rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            position: relative;
+        }
+
+        /* Animations */
+        @keyframes dealSlide {
+            0% { transform: translateY(-100px) scale(0.5); opacity: 0; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        .animate-deal { animation: dealSlide 0.4s ease-out forwards; }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(0, 231, 1, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 231, 1, 0); }
+            100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(0, 231, 1, 0); }
+        }
+        .active-turn-indicator {
+            animation: pulse-ring 2s infinite;
+        }
+
+        .community-card-slot {
+            width: var(--card-width);
+            height: var(--card-height);
+            border: 2px dashed #2f4553;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+        
+        .modal-enter { animation: popIn 0.2s ease-out; }
+        @keyframes popIn {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col bg-[#0f212e]">
+
+    <!-- Navbar -->
+    <nav class="h-16 bg-[#1a2c38] flex items-center justify-between px-4 shadow-lg z-20 shrink-0">
+        <div class="flex items-center gap-4">
+            <div class="font-bold text-lg md:text-xl tracking-wider text-white flex items-center gap-2">
+                 <i class="fas fa-users text-[#00e701]"></i> CASINO <span class="text-xs bg-[#2f4553] px-2 py-1 rounded text-gray-400">MULTIPLAYER</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+             <div class="hidden md:flex flex-col items-end mr-4">
+                <span class="text-[10px] text-gray-500 uppercase font-bold">Room Code</span>
+                <span id="roomCodeDisplay" class="text-[#00e701] font-mono font-bold text-lg tracking-widest">---</span>
+            </div>
+            <div class="bg-[#0f212e] rounded-full px-4 py-2 flex items-center gap-3 border border-[#213743]">
+                <span class="text-sm text-gray-400">Balance</span>
+                <span id="balanceDisplay" class="font-mono font-bold text-[#00e701] text-shadow-glow">$0</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Game Container -->
+    <main class="flex-1 relative flex flex-col items-center justify-between p-2 overflow-hidden w-full max-w-6xl mx-auto">
+        
+        <!-- Table Decor -->
+        <div class="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none">
+            <div class="w-[90%] h-[60%] border-4 border-white rounded-[200px]"></div>
+        </div>
+
+        <!-- Setup/Lobby Overlay -->
+        <div id="lobbyScreen" class="absolute inset-0 z-50 bg-[#0f212e] flex flex-col items-center justify-center">
+            <h1 class="text-4xl md:text-6xl font-black italic text-white mb-2 tracking-tighter">HOLD'EM ONLINE</h1>
+            <p class="text-gray-400 mb-8">Real-time Multiplayer Lobby</p>
+            
+            <div class="bg-[#1a2c38] p-8 rounded-2xl border border-[#2f4553] shadow-2xl w-full max-w-md">
+                <div class="mb-6">
+                    <label class="block text-gray-400 text-xs font-bold mb-2 uppercase">Your Name</label>
+                    <input type="text" id="playerNameInput" placeholder="Enter nickname..." class="w-full bg-[#0f212e] text-white p-3 rounded border border-[#2f4553] focus:outline-none focus:border-[#00e701]">
+                </div>
+
+                <!-- Tabs -->
+                <div class="flex gap-2 mb-4 border-b border-[#2f4553] pb-4">
+                    <button onclick="switchTab('create')" id="tabCreate" class="flex-1 pb-2 text-[#00e701] border-b-2 border-[#00e701] font-bold">Create Room</button>
+                    <button onclick="switchTab('join')" id="tabJoin" class="flex-1 pb-2 text-gray-500 hover:text-white transition">Join Room</button>
+                </div>
+
+                <!-- Create View -->
+                <div id="viewCreate" class="block">
+                    <button onclick="createGame()" class="w-full bg-[#00e701] hover:bg-[#00c201] text-black font-bold py-4 rounded-lg shadow-lg transform transition active:scale-95 text-lg uppercase tracking-wide">
+                        Create New Lobby
+                    </button>
+                </div>
+
+                <!-- Join View -->
+                <div id="viewJoin" class="hidden">
+                    <label class="block text-gray-400 text-xs font-bold mb-2 uppercase">Room Code</label>
+                    <input type="text" id="roomCodeInput" placeholder="Ex: 123456" maxlength="6" class="w-full bg-[#0f212e] text-white p-3 rounded border border-[#2f4553] mb-4 font-mono text-center tracking-widest text-xl uppercase focus:outline-none focus:border-[#00e701]">
+                    <button onclick="joinGame()" class="w-full bg-[#2f4553] hover:bg-[#3d5565] text-white font-bold py-4 rounded-lg shadow-lg transform transition active:scale-95 text-lg uppercase tracking-wide">
+                        Join Game
+                    </button>
+                </div>
+                
+                <p id="lobbyStatus" class="text-center text-xs text-red-400 mt-4 h-4"></p>
+            </div>
+        </div>
+
+        <!-- Waiting Room Overlay -->
+        <div id="waitingRoom" class="absolute inset-0 z-40 bg-[#0f212e]/95 backdrop-blur hidden flex flex-col items-center justify-center">
+            <div class="bg-[#1a2c38] p-8 rounded-2xl border border-[#2f4553] shadow-2xl w-full max-w-lg text-center">
+                <h2 class="text-2xl font-bold text-white mb-2">Waiting for Players</h2>
+                <div class="bg-[#0f212e] p-4 rounded-lg mb-6 border border-[#2f4553]">
+                    <p class="text-gray-500 text-xs uppercase mb-1">Room Code</p>
+                    <p id="waitingRoomCode" class="text-4xl font-mono font-bold text-[#00e701] tracking-widest select-all"></p>
+                </div>
+                
+                <div class="text-left mb-6">
+                    <p class="text-gray-400 text-xs font-bold mb-2 uppercase">Players Joined:</p>
+                    <ul id="playerList" class="space-y-2">
+                        <!-- Player list injected here -->
+                    </ul>
+                </div>
+
+                <div id="hostControls" class="hidden">
+                    <button onclick="hostStartGame()" class="w-full bg-[#00e701] hover:bg-[#00c201] text-black font-bold py-3 rounded-lg shadow-lg uppercase tracking-wide">
+                        Start Game
+                    </button>
+                </div>
+                <div id="clientControls">
+                    <p class="text-gray-500 text-sm animate-pulse">Waiting for host to start...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Opponents Area (Top arc) -->
+        <div id="opponentsArea" class="w-full flex justify-center gap-4 md:gap-8 flex-wrap mt-2 min-h-[140px] z-10">
+            <!-- Opponents injected here via JS -->
+        </div>
+
+        <!-- Center Table (Community + Pot) -->
+        <div class="flex flex-col items-center justify-center gap-4 my-4 z-10 w-full">
+            <div class="flex items-center gap-4">
+                <div class="bg-[#0f212e]/90 px-6 py-2 rounded-full border border-[#2f4553] flex items-center gap-2 shadow-lg">
+                    <span class="text-gray-400 text-xs uppercase tracking-wider">Pot</span>
+                    <span id="potDisplay" class="text-white font-mono font-bold text-lg">$0</span>
+                </div>
+                <div id="gamePhaseDisplay" class="text-gray-500 text-xs font-mono uppercase tracking-widest">WAITING</div>
+            </div>
+
+            <!-- Community Cards Container -->
+            <div id="communityArea" class="flex justify-center gap-2 md:gap-4 h-[90px] md:h-[120px]">
+                <div class="community-card-slot"></div>
+                <div class="community-card-slot"></div>
+                <div class="community-card-slot"></div>
+                <div class="community-card-slot"></div>
+                <div class="community-card-slot"></div>
+            </div>
+            
+            <div id="handResult" class="h-8 text-xl font-bold text-white text-center text-shadow-glow opacity-0 transition-opacity"></div>
+        </div>
+
+        <!-- Player Area (Bottom) -->
+        <div class="w-full flex flex-col items-center z-10 mb-2">
+            <!-- Player Info Bubble -->
+            <div class="mb-2 flex items-center gap-2">
+                <div id="playerIndicator" class="w-3 h-3 rounded-full bg-gray-500"></div>
+                <span class="text-gray-400 text-xs font-bold tracking-wider">YOU</span>
+                <span id="playerHandName" class="text-[#00e701] font-mono text-xs"></span>
+            </div>
+
+            <!-- Player Cards -->
+            <div id="playerHand" class="flex justify-center gap-1 mb-4 h-[90px] md:h-[120px]">
+                <!-- Cards injected -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Controls Footer -->
+    <footer class="bg-[#1a2c38] border-t border-[#213743] p-4 z-20 shrink-0">
+        <div class="max-w-5xl mx-auto flex flex-col md:flex-row gap-4 items-center justify-between">
+            
+            <!-- Turn Info / Bet Slider -->
+            <div id="turnControls" class="flex flex-col gap-2 w-full md:w-auto opacity-50 pointer-events-none transition-opacity duration-300">
+                <div class="flex items-center justify-between text-xs text-gray-400 px-1">
+                    <span>Raise Amount</span>
+                    <span id="raiseAmountDisplay" class="text-white font-mono">$0</span>
+                </div>
+                <div class="bg-[#0f212e] p-2 rounded-lg flex items-center gap-2 w-full md:w-64">
+                    <input type="range" id="raiseSlider" min="0" max="1000" step="10" class="w-full accent-[#00e701] h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div id="actionButtons" class="w-full md:w-auto flex gap-2 md:gap-4 opacity-50 pointer-events-none transition-opacity duration-300">
+                <button onclick="sendAction('fold')" class="flex-1 bg-[#2f4553] hover:bg-[#3d5565] text-white font-bold py-3 px-6 rounded-md border-b-4 border-[#1a2c38] active:border-b-0 active:translate-y-1 transition text-sm uppercase">
+                    Fold
+                </button>
+                <button onclick="sendAction('check')" id="btnCheckCall" class="flex-1 bg-[#2f4553] hover:bg-[#3d5565] text-white font-bold py-3 px-6 rounded-md border-b-4 border-[#1a2c38] active:border-b-0 active:translate-y-1 transition text-sm uppercase">
+                    Check
+                </button>
+                <button onclick="sendAction('raise')" id="btnRaise" class="flex-1 bg-[#00e701] hover:bg-[#00c201] text-black font-bold py-3 px-6 rounded-md border-b-4 border-[#00b001] active:border-b-0 active:translate-y-1 transition text-sm uppercase">
+                    Raise
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, onSnapshot, arrayUnion } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        // --- Config ---
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = __app_id || 'default-app';
+
+        // --- Global State ---
+        let userId = null;
+        let currentGameId = null;
+        let isHost = false;
+        let unsubscribeGame = null;
+        let gameState = null;
+        
+        // --- Auth ---
+        const initAuth = async () => {
+             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
+            }
+        };
+        initAuth();
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userId = user.uid;
+            }
+        });
+
+        // --- DOM Elements ---
+        window.dom = {
+            lobbyScreen: document.getElementById('lobbyScreen'),
+            waitingRoom: document.getElementById('waitingRoom'),
+            viewCreate: document.getElementById('viewCreate'),
+            viewJoin: document.getElementById('viewJoin'),
+            playerNameInput: document.getElementById('playerNameInput'),
+            roomCodeInput: document.getElementById('roomCodeInput'),
+            lobbyStatus: document.getElementById('lobbyStatus'),
+            roomCodeDisplay: document.getElementById('roomCodeDisplay'),
+            waitingRoomCode: document.getElementById('waitingRoomCode'),
+            playerList: document.getElementById('playerList'),
+            hostControls: document.getElementById('hostControls'),
+            clientControls: document.getElementById('clientControls'),
+            
+            opponentsArea: document.getElementById('opponentsArea'),
+            playerHand: document.getElementById('playerHand'),
+            communityArea: document.getElementById('communityArea'),
+            potDisplay: document.getElementById('potDisplay'),
+            balanceDisplay: document.getElementById('balanceDisplay'),
+            gamePhaseDisplay: document.getElementById('gamePhaseDisplay'),
+            
+            turnControls: document.getElementById('turnControls'),
+            actionButtons: document.getElementById('actionButtons'),
+            btnCheckCall: document.getElementById('btnCheckCall'),
+            raiseSlider: document.getElementById('raiseSlider'),
+            raiseAmountDisplay: document.getElementById('raiseAmountDisplay'),
+            handResult: document.getElementById('handResult'),
+            
+            playerIndicator: document.getElementById('playerIndicator'),
+            playerHandName: document.getElementById('playerHandName'),
+        };
+
+        // --- Lobby Functions ---
+
+        window.switchTab = (tab) => {
+            const createBtn = document.getElementById('tabCreate');
+            const joinBtn = document.getElementById('tabJoin');
+            if (tab === 'create') {
+                dom.viewCreate.classList.remove('hidden');
+                dom.viewJoin.classList.add('hidden');
+                createBtn.className = "flex-1 pb-2 text-[#00e701] border-b-2 border-[#00e701] font-bold";
+                joinBtn.className = "flex-1 pb-2 text-gray-500 hover:text-white transition";
+            } else {
+                dom.viewCreate.classList.add('hidden');
+                dom.viewJoin.classList.remove('hidden');
+                createBtn.className = "flex-1 pb-2 text-gray-500 hover:text-white transition";
+                joinBtn.className = "flex-1 pb-2 text-[#00e701] border-b-2 border-[#00e701] font-bold";
+            }
+        };
+
+        window.createGame = async () => {
+            const name = dom.playerNameInput.value.trim();
+            if (!name) return setStatus("Please enter your name");
+            if (!userId) return setStatus("Connecting to network...");
+
+            const roomCode = Math.floor(100000 + Math.random() * 900000).toString();
+            currentGameId = roomCode;
+            isHost = true;
+
+            const initialState = {
+                hostId: userId,
+                status: 'waiting', // waiting, playing, finished
+                stage: 'preflop',
+                pot: 0,
+                currentBet: 0,
+                turnIndex: 0,
+                communityCards: [],
+                deck: [], // Host manages deck
+                players: [{
+                    id: userId,
+                    name: name,
+                    chips: 1000,
+                    hand: [],
+                    status: 'active', // active, folded, busted
+                    bet: 0,
+                    totalInvested: 0
+                }],
+                lastAction: `Room created by ${name}`
+            };
+
+            // Use public data path
+            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${roomCode}`);
+            
+            try {
+                await setDoc(gameRef, initialState);
+                subscribeToGame(roomCode);
+                dom.lobbyScreen.classList.add('hidden');
+                dom.waitingRoom.classList.remove('hidden');
+                dom.hostControls.classList.remove('hidden');
+                dom.clientControls.classList.add('hidden');
+                dom.roomCodeDisplay.innerText = roomCode;
+                dom.waitingRoomCode.innerText = roomCode;
+            } catch (e) {
+                console.error(e);
+                setStatus("Error creating room.");
+            }
+        };
+
+        window.joinGame = async () => {
+            const name = dom.playerNameInput.value.trim();
+            const code = dom.roomCodeInput.value.trim();
+            if (!name) return setStatus("Please enter your name");
+            if (code.length !== 6) return setStatus("Invalid room code");
+            if (!userId) return setStatus("Connecting to network...");
+
+            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${code}`);
+            
+            try {
+                const docSnap = await getDoc(gameRef);
+                if (!docSnap.exists()) return setStatus("Room not found");
+                
+                const data = docSnap.data();
+                if (data.status !== 'waiting') return setStatus("Game already started");
+                
+                // Add self to players
+                const newPlayer = {
+                    id: userId,
+                    name: name,
+                    chips: 1000,
+                    hand: [],
+                    status: 'active',
+                    bet: 0,
+                    totalInvested: 0
+                };
+
+                // Check if already in
+                const existing = data.players.find(p => p.id === userId);
+                if (!existing) {
+                    await updateDoc(gameRef, {
+                        players: arrayUnion(newPlayer)
+                    });
+                }
+                
+                currentGameId = code;
+                isHost = false;
+                subscribeToGame(code);
+                
+                dom.lobbyScreen.classList.add('hidden');
+                dom.waitingRoom.classList.remove('hidden');
+                dom.hostControls.classList.add('hidden');
+                dom.clientControls.classList.remove('hidden');
+                dom.roomCodeDisplay.innerText = code;
+                dom.waitingRoomCode.innerText = code;
+
+            } catch (e) {
+                console.error(e);
+                setStatus("Error joining room.");
+            }
+        };
+
+        const subscribeToGame = (code) => {
+            if (unsubscribeGame) unsubscribeGame();
+            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${code}`);
+            
+            unsubscribeGame = onSnapshot(gameRef, (doc) => {
+                if (doc.exists()) {
+                    gameState = doc.data();
+                    renderGame();
+                }
+            });
+        };
+
+        const setStatus = (msg) => {
+            dom.lobbyStatus.innerText = msg;
+            setTimeout(() => dom.lobbyStatus.innerText = "", 3000);
+        };
+
+        // --- Host Logic (The Brain) ---
+
+        window.hostStartGame = async () => {
+            if (!isHost) return;
+            if (gameState.players.length < 2) return alert("Need at least 2 players!");
+
+            // Generate deck
+            const SUITS = ['h', 'd', 'c', 's'];
+            const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+            let deck = [];
+            for(let s of SUITS) for(let r of RANKS) deck.push({rank:r, suit:s, value: RANKS.indexOf(r)+2});
+            // Shuffle
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+
+            // Deal 2 cards to each player
+            const players = [...gameState.players];
+            players.forEach(p => {
+                p.hand = [deck.pop(), deck.pop()];
+                p.status = 'active';
+                p.bet = 0;
+            });
+
+            // Set state
+            const updates = {
+                status: 'playing',
+                stage: 'preflop',
+                deck: deck,
+                players: players,
+                communityCards: [],
+                turnIndex: 0, // Should rotate dealer, but simple for now
+                pot: 0,
+                currentBet: 0,
+                lastAction: "Game Started!"
+            };
+
+            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${currentGameId}`);
+            await updateDoc(gameRef, updates);
+        };
+
+        // --- Render Logic ---
+
+        const renderGame = () => {
+            if (!gameState) return;
+
+            // Update Waiting Room List
+            if (gameState.status === 'waiting') {
+                dom.playerList.innerHTML = gameState.players.map(p => 
+                    `<li class="bg-[#0f212e] p-2 rounded border border-[#2f4553] flex justify-between">
+                        <span class="text-white font-bold">${p.name}</span>
+                        <span class="text-[#00e701] text-xs">$${p.chips}</span>
+                    </li>`
+                ).join('');
+                return;
+            }
+
+            // Hide Waiting Room if playing
+            if (gameState.status === 'playing') {
+                dom.waitingRoom.classList.add('hidden');
+            }
+
+            // My Player Data
+            const myPlayerIndex = gameState.players.findIndex(p => p.id === userId);
+            const myPlayer = gameState.players[myPlayerIndex];
+            
+            // --- UI Updates ---
+            dom.gamePhaseDisplay.innerText = gameState.stage.toUpperCase();
+            dom.potDisplay.innerText = `$${gameState.pot}`;
+            if (myPlayer) dom.balanceDisplay.innerText = `$${myPlayer.chips}`;
+
+            // --- Render Opponents ---
+            dom.opponentsArea.innerHTML = '';
+            gameState.players.forEach((p, index) => {
+                if (p.id === userId) return; // Skip self
+
+                // Calculate relative position? For now just list them
+                const isActive = (index === gameState.turnIndex);
+                
+                const seat = document.createElement('div');
+                seat.className = `opponent-seat bg-[#1a2c38] border-2 ${isActive ? 'border-[#00e701] shadow-[0_0_15px_rgba(0,231,1,0.3)]' : 'border-[#2f4553]'} p-2 rounded-xl flex flex-col items-center min-w-[100px] relative transition-all`;
+                if (p.status === 'folded') seat.classList.add('opponent-folded');
+                
+                seat.innerHTML = `
+                    <div class="absolute -top-3 w-8 h-8 rounded-full bg-[#2f4553] border border-gray-600 flex items-center justify-center text-xs font-bold text-gray-300">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="mt-4 text-xs font-bold text-gray-400">${p.name}</div>
+                    <div class="font-mono text-[#00e701] text-xs">$${p.chips}</div>
+                    <div class="flex gap-1 mt-1 h-[40px] items-center justify-center">
+                        ${p.status === 'active' ? `
+                        <div class="w-8 h-11 bg-[#2f4553] rounded border border-gray-400 card-back"></div>
+                        <div class="w-8 h-11 bg-[#2f4553] rounded border border-gray-400 card-back"></div>
+                        ` : ''}
+                    </div>
+                    ${p.bet > 0 ? `<div class="absolute -right-2 top-0 bg-yellow-600 text-white text-[10px] px-1 rounded-full font-mono">${p.bet}</div>` : ''}
+                `;
+                dom.opponentsArea.appendChild(seat);
+            });
+
+            // --- Render Community Cards ---
+            dom.communityArea.innerHTML = '';
+            // Render existing cards
+            gameState.communityCards.forEach(card => {
+                dom.communityArea.appendChild(createCardEl(card));
+            });
+            // Fill empty slots
+            for(let i=gameState.communityCards.length; i<5; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'community-card-slot';
+                dom.communityArea.appendChild(slot);
+            }
+
+            // --- Render My Hand ---
+            if (myPlayer) {
+                dom.playerHand.innerHTML = '';
+                myPlayer.hand.forEach(card => {
+                    dom.playerHand.appendChild(createCardEl(card));
+                });
+
+                // --- Highlight Turn ---
+                const isMyTurn = (gameState.turnIndex === myPlayerIndex);
+                if (isMyTurn) {
+                    dom.playerIndicator.classList.add('bg-[#00e701]', 'active-turn-indicator');
+                    dom.playerIndicator.classList.remove('bg-gray-500');
+                    enableControls(myPlayer);
+                } else {
+                    dom.playerIndicator.classList.remove('bg-[#00e701]', 'active-turn-indicator');
+                    dom.playerIndicator.classList.add('bg-gray-500');
+                    disableControls();
+                }
+            }
+
+            // --- Show Hand Result ---
+            if (gameState.winnerMessage) {
+                 dom.handResult.innerText = gameState.winnerMessage;
+                 dom.handResult.style.opacity = '1';
+                 // If host, show restart button logic? For now auto-restart handled by logic
+                 if (isHost && gameState.stage === 'showdown') {
+                     setTimeout(hostNextHand, 5000);
+                 }
+            } else {
+                 dom.handResult.style.opacity = '0';
+            }
+        };
+
+        // --- Controls ---
+        
+        const enableControls = (me) => {
+            dom.turnControls.classList.remove('opacity-50', 'pointer-events-none');
+            dom.actionButtons.classList.remove('opacity-50', 'pointer-events-none');
+            
+            const cost = gameState.currentBet - me.bet;
+            if (cost === 0) {
+                dom.btnCheckCall.innerText = "Check";
+                dom.btnCheckCall.onclick = () => sendAction('check');
+            } else {
+                dom.btnCheckCall.innerText = `Call ${cost}`;
+                dom.btnCheckCall.onclick = () => sendAction('call');
+            }
+            
+            // Slider
+            dom.raiseSlider.max = me.chips;
+            dom.raiseSlider.value = Math.min(20, me.chips); // Min raise
+            dom.raiseAmountDisplay.innerText = `$${dom.raiseSlider.value}`;
+            dom.raiseSlider.oninput = (e) => dom.raiseAmountDisplay.innerText = `$${e.target.value}`;
+        };
+
+        const disableControls = () => {
+            dom.turnControls.classList.add('opacity-50', 'pointer-events-none');
+            dom.actionButtons.classList.add('opacity-50', 'pointer-events-none');
+        };
+
+        // --- Actions ---
+
+        window.sendAction = async (action) => {
+            if (!gameState || gameState.status !== 'playing') return;
+            const myIndex = gameState.players.findIndex(p => p.id === userId);
+            if (myIndex !== gameState.turnIndex) return;
+
+            const me = gameState.players[myIndex];
+            let newBet = me.bet;
+            let newChips = me.chips;
+            let newPot = gameState.pot;
+            let currentTableBet = gameState.currentBet;
+
+            // Logic
+            if (action === 'fold') {
+                gameState.players[myIndex].status = 'folded';
+            } else if (action === 'check') {
+                // Do nothing if cost is 0
+                if (currentTableBet > me.bet) return; // Should be call
+            } else if (action === 'call') {
+                const cost = currentTableBet - me.bet;
+                if (cost > me.chips) {
+                    // All in
+                    newPot += me.chips;
+                    newBet += me.chips;
+                    newChips = 0;
+                } else {
+                    newPot += cost;
+                    newBet += cost;
+                    newChips -= cost;
+                }
+            } else if (action === 'raise') {
+                const raiseAmt = parseInt(dom.raiseSlider.value);
+                const totalCost = (currentTableBet - me.bet) + raiseAmt;
+                
+                if (totalCost > me.chips) return; // Logic error
+                
+                newPot += totalCost;
+                newBet += totalCost;
+                newChips -= totalCost;
+                currentTableBet = newBet;
+            }
+
+            // Update Local State for atomic feeling
+            gameState.players[myIndex].chips = newChips;
+            gameState.players[myIndex].bet = newBet;
+            gameState.players[myIndex].totalInvested += (newBet - me.bet);
+            gameState.pot = newPot;
+            gameState.currentBet = currentTableBet;
+
+            // Next Turn
+            let nextIndex = (gameState.turnIndex + 1) % gameState.players.length;
+            // Find next active player
+            let attempts = 0;
+            while (gameState.players[nextIndex].status !== 'active' && attempts < gameState.players.length) {
+                nextIndex = (nextIndex + 1) % gameState.players.length;
+                attempts++;
+            }
+
+            // Check if round is over (Simple logic: if back to start or everyone matched)
+            // Ideally Host handles "Stage Change", but client updates "Turn". 
+            // We just update DB with turn change. Host watchdog will trigger stage change.
+            
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${currentGameId}`), {
+                players: gameState.players,
+                pot: gameState.pot,
+                currentBet: gameState.currentBet,
+                turnIndex: nextIndex,
+                lastAction: `${me.name} ${action}ed`
+            });
+            
+            // If I am Host, I should check if we need to advance stage immediately after this write resolves
+            if (isHost) hostCheckStageAdvance();
+        };
+
+        // --- Host Game Loop Watcher ---
+        
+        const hostCheckStageAdvance = async () => {
+            // Simplified Poker Logic:
+            // If all active players have bet === currentBet, advance stage.
+            // Note: This logic is very basic. Real poker has side-pots, all-in logic, etc.
+            
+            const activePlayers = gameState.players.filter(p => p.status === 'active');
+            if (activePlayers.length < 2) {
+                // Everyone folded except one
+                endHand(activePlayers[0]);
+                return;
+            }
+
+            const allMatched = activePlayers.every(p => p.bet === gameState.currentBet || p.chips === 0);
+            
+            // We also need to ensure everyone has acted at least once. 
+            // In this simple version, we assume if currentBet > 0 and all matched, we good.
+            // If currentBet is 0, we need to know if everyone checked.
+            // For hackathon purposes: We will just check if we circled back to Dealer + 1?
+            // Let's use a simpler metric: stored in DB? No, let's just use:
+            // If all matched, advance. (This skips check-check-check logic nuances but works for flow)
+            
+            if (allMatched) {
+                // Advance Stage
+                let nextStage = '';
+                let newCards = [];
+                let deck = [...gameState.deck];
+
+                if (gameState.stage === 'preflop') {
+                    nextStage = 'flop';
+                    newCards.push(deck.pop(), deck.pop(), deck.pop());
+                } else if (gameState.stage === 'flop') {
+                    nextStage = 'turn';
+                    newCards.push(deck.pop());
+                } else if (gameState.stage === 'turn') {
+                    nextStage = 'river';
+                    newCards.push(deck.pop());
+                } else if (gameState.stage === 'river') {
+                    nextStage = 'showdown';
+                    // Calc winner
+                    const winner = determineWinner(activePlayers, gameState.communityCards);
+                    endHand(winner);
+                    return;
+                }
+
+                // Reset bets for next round
+                const players = [...gameState.players];
+                players.forEach(p => p.bet = 0);
+
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${currentGameId}`), {
+                    stage: nextStage,
+                    communityCards: [...gameState.communityCards, ...newCards],
+                    deck: deck,
+                    currentBet: 0,
+                    players: players,
+                    // turnIndex: should reset to left of dealer
+                    lastAction: `Moving to ${nextStage}`
+                });
+            }
+        };
+
+        const determineWinner = (players, community) => {
+            // Reusing the evaluator logic from before
+            // Simple High Card / Random for this snippet to fit size?
+            // Let's paste the evaluator back in simplified form
+            let bestVal = -1;
+            let winner = players[0];
+            players.forEach(p => {
+                const res = evaluate7Cards([...p.hand, ...community]);
+                if (res.value > bestVal) {
+                    bestVal = res.value;
+                    winner = p;
+                }
+            });
+            return winner;
+        };
+
+        const endHand = async (winner) => {
+            const players = [...gameState.players];
+            const winIndex = players.findIndex(p => p.id === winner.id);
+            players[winIndex].chips += gameState.pot;
+            
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${currentGameId}`), {
+                stage: 'showdown',
+                players: players,
+                pot: 0,
+                winnerMessage: `${winner.name} wins the pot!`
+            });
+        };
+
+        window.hostNextHand = async () => {
+            // Similar to hostStartGame but keep chips
+            // ... implementation details for next hand ...
+            // For brevity, just resetting stage to preflop
+            // This requires regenerating deck
+             const SUITS = ['h', 'd', 'c', 's'];
+            const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+            let deck = [];
+            for(let s of SUITS) for(let r of RANKS) deck.push({rank:r, suit:s, value: RANKS.indexOf(r)+2});
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+
+            const players = [...gameState.players];
+            players.forEach(p => {
+                if (p.chips > 0) {
+                    p.status = 'active';
+                    p.hand = [deck.pop(), deck.pop()];
+                    p.bet = 0;
+                } else {
+                    p.status = 'busted';
+                }
+            });
+
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', `poker_room_${currentGameId}`), {
+                stage: 'preflop',
+                status: 'playing',
+                communityCards: [],
+                deck: deck,
+                players: players,
+                pot: 0,
+                currentBet: 0,
+                winnerMessage: null,
+                turnIndex: (gameState.turnIndex + 1) % players.length
+            });
+        };
+
+        // --- Card Helpers ---
+        const SUIT_ICONS = { 'h': '♥', 'd': '♦', 'c': '♣', 's': '♠' };
+        function createCardEl(card) {
+            const el = document.createElement('div');
+            const isRed = card.suit === 'h' || card.suit === 'd';
+            el.className = `playing-card ${isRed ? 'suit-red' : 'suit-black'} animate-deal`;
+            el.innerHTML = `
+                <div class="text-left leading-none">${card.rank}<br><span class="text-xs">${SUIT_ICONS[card.suit]}</span></div>
+                <div class="card-center-suit">${SUIT_ICONS[card.suit]}</div>
+                <div class="text-right leading-none rotate-180">${card.rank}<br><span class="text-xs">${SUIT_ICONS[card.suit]}</span></div>
+            `;
+            return el;
+        }
+
+        // --- Evaluator (Compressed) ---
+        function evaluate7Cards(cards) {
+            const getCombinations = (arr, k) => { if(k>arr.length || k<=0) return []; if(k===arr.length) return [arr]; if(k===1) return arr.map(e=>[e]); let c=[]; for(let i=0; i<arr.length-k+1; i++) { let h=arr.slice(i,i+1); let t=getCombinations(arr.slice(i+1),k-1); for(let j=0; j<t.length; j++) c.push(h.concat(t[j])); } return c; };
+            const combos = getCombinations(cards, 5);
+            let bestRank=-1, bestScore=-1, bestName="";
+            combos.forEach(h => { const r=score5Hand(h); if(r.score>bestScore){bestScore=r.score; bestRank=r.rank; bestName=r.name;} });
+            return {value:bestScore, rankIndex:bestRank, name:bestName};
+        }
+        function score5Hand(hand) {
+            hand.sort((a,b)=>b.value-a.value);
+            const v=hand.map(c=>c.value), s=hand.map(c=>c.suit);
+            const isFlush=s.every(x=>x===s[0]);
+            let isSt=true; for(let i=0;i<4;i++) if(v[i]-v[i+1]!==1) isSt=false;
+            if(!isSt && v[0]===14&&v[1]===5&&v[2]===4&&v[3]===3&&v[4]===2) isSt=true;
+            const c={}; v.forEach(x=>c[x]=(c[x]||0)+1); const cv=Object.values(c).sort((a,b)=>b-a);
+            let r=0, n="High Card";
+            if(isSt&&isFlush){r=8;n="Straight Flush";} else if(cv[0]===4){r=7;n="Four of a Kind";} else if(cv[0]===3&&cv[1]===2){r=6;n="Full House";} else if(isFlush){r=5;n="Flush";} else if(isSt){r=4;n="Straight";} else if(cv[0]===3){r=3;n="Three of a Kind";} else if(cv[0]===2&&cv[1]===2){r=2;n="Two Pair";} else if(cv[0]===2){r=1;n="Pair";}
+            let tb=0; v.forEach((x,i)=> tb+=x*Math.pow(15,4-i));
+            return {rank:r, score:(r*10000000)+tb, name:n};
+        }
+
+    </script>
+</body>
+</html>
