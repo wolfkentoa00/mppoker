@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>High Stakes Poker - Online</title>
+    <title>MPPoker</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <!-- Socket.io Client -->
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -14,9 +13,7 @@
         :root {
             --stake-dark: #0f212e;
             --stake-card: #1a2c38;
-            --stake-hover: #213743;
             --stake-green: #00e701;
-            --stake-green-hover: #00c201;
             --card-width: 60px;
             --card-height: 84px;
         }
@@ -27,7 +24,6 @@
             color: white;
             overflow-x: hidden;
             user-select: none;
-            -webkit-user-select: none;
         }
 
         /* Card Styles */
@@ -44,20 +40,13 @@
             position: relative;
             font-weight: bold;
             font-size: 0.9rem;
-            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.27), left 0.4s ease;
+            transition: transform 0.4s;
             backface-visibility: hidden;
         }
         
         @media (min-width: 768px) {
-            :root {
-                --card-width: 80px;
-                --card-height: 112px;
-            }
-            .playing-card {
-                font-size: 1.2rem;
-                padding: 6px;
-                border-radius: 8px;
-            }
+            :root { --card-width: 80px; --card-height: 112px; }
+            .playing-card { font-size: 1.2rem; padding: 6px; border-radius: 8px; }
         }
 
         .suit-red { color: #e91e63; }
@@ -78,20 +67,20 @@
             opacity: 0.2;
         }
 
-        /* Animations */
         @keyframes dealSlide {
             0% { transform: translateY(-100px) scale(0.5); opacity: 0; }
             100% { transform: translateY(0) scale(1); opacity: 1; }
         }
         .animate-deal { animation: dealSlide 0.4s ease-out forwards; }
 
-        @keyframes pulse-ring {
-            0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(0, 231, 1, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 231, 1, 0); }
-            100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(0, 231, 1, 0); }
-        }
         .active-turn-indicator {
+            box-shadow: 0 0 0 4px rgba(0, 231, 1, 0.4);
             animation: pulse-ring 2s infinite;
+        }
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(0, 231, 1, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 231, 1, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 231, 1, 0); }
         }
 
         .community-card-slot {
@@ -99,10 +88,6 @@
             height: var(--card-height);
             border: 2px dashed #2f4553;
             border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s;
         }
         
         .opponent-seat { transition: all 0.3s ease; }
@@ -115,12 +100,12 @@
     <nav class="h-16 bg-[#1a2c38] flex items-center justify-between px-4 shadow-lg z-20 shrink-0">
         <div class="flex items-center gap-4">
             <div class="font-bold text-lg md:text-xl tracking-wider text-white flex items-center gap-2">
-                 <i class="fas fa-users text-[#00e701]"></i> CASINO <span class="text-xs bg-[#2f4553] px-2 py-1 rounded text-gray-400">ONLINE</span>
+                 <i class="fas fa-users text-[#00e701]"></i> CASINO
             </div>
         </div>
         <div class="flex items-center gap-3">
              <div class="hidden md:flex flex-col items-end mr-4">
-                <span class="text-[10px] text-gray-500 uppercase font-bold">Room Code</span>
+                <span class="text-[10px] text-gray-500 uppercase font-bold">Room</span>
                 <span id="roomCodeDisplay" class="text-[#00e701] font-mono font-bold text-lg tracking-widest">---</span>
             </div>
             <div class="bg-[#0f212e] rounded-full px-4 py-2 flex items-center gap-3 border border-[#213743]">
@@ -133,18 +118,12 @@
     <!-- Game Container -->
     <main class="flex-1 relative flex flex-col items-center justify-between p-2 overflow-hidden w-full max-w-6xl mx-auto">
         
-        <!-- Table Decor -->
-        <div class="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none">
-            <div class="w-[90%] h-[60%] border-4 border-white rounded-[200px]"></div>
-        </div>
-
-        <!-- Setup/Lobby Overlay -->
+        <!-- Setup/Lobby -->
         <div id="lobbyScreen" class="absolute inset-0 z-50 bg-[#0f212e] flex flex-col items-center justify-center">
             <h1 class="text-4xl md:text-6xl font-black italic text-white mb-2 tracking-tighter">HOLD'EM ONLINE</h1>
-            <p class="text-gray-400 mb-8">Multiplayer Lobby</p>
             
             <div class="bg-[#1a2c38] p-8 rounded-2xl border border-[#2f4553] shadow-2xl w-full max-w-md">
-                <div class="mb-6">
+                <div class="mb-4">
                     <label class="block text-gray-400 text-xs font-bold mb-2 uppercase">Your Name</label>
                     <input type="text" id="playerNameInput" placeholder="Enter nickname..." class="w-full bg-[#0f212e] text-white p-3 rounded border border-[#2f4553] focus:outline-none focus:border-[#00e701]">
                 </div>
@@ -157,7 +136,11 @@
 
                 <!-- Create View -->
                 <div id="viewCreate" class="block">
-                    <button onclick="createGame()" class="w-full bg-[#00e701] hover:bg-[#00c201] text-black font-bold py-4 rounded-lg shadow-lg transform transition active:scale-95 text-lg uppercase tracking-wide">
+                    <div class="mb-6">
+                        <label class="block text-gray-400 text-xs font-bold mb-2 uppercase">Starting Stack</label>
+                        <input type="number" id="startStackInput" value="1000" class="w-full bg-[#0f212e] text-white p-3 rounded border border-[#2f4553] focus:outline-none focus:border-[#00e701] font-mono">
+                    </div>
+                    <button onclick="createGame()" class="w-full bg-[#00e701] hover:bg-[#00c201] text-black font-bold py-4 rounded-lg shadow-lg uppercase tracking-wide">
                         Create New Lobby
                     </button>
                 </div>
@@ -166,17 +149,17 @@
                 <div id="viewJoin" class="hidden">
                     <label class="block text-gray-400 text-xs font-bold mb-2 uppercase">Room Code</label>
                     <input type="text" id="roomCodeInput" placeholder="Ex: 123456" maxlength="6" class="w-full bg-[#0f212e] text-white p-3 rounded border border-[#2f4553] mb-4 font-mono text-center tracking-widest text-xl uppercase focus:outline-none focus:border-[#00e701]">
-                    <button onclick="joinGame()" class="w-full bg-[#2f4553] hover:bg-[#3d5565] text-white font-bold py-4 rounded-lg shadow-lg transform transition active:scale-95 text-lg uppercase tracking-wide">
+                    <button onclick="joinGame()" class="w-full bg-[#2f4553] hover:bg-[#3d5565] text-white font-bold py-4 rounded-lg shadow-lg uppercase tracking-wide">
                         Join Game
                     </button>
                 </div>
                 
                 <p id="lobbyStatus" class="text-center text-xs text-red-400 mt-4 h-4"></p>
-                <p id="connectionStatus" class="text-center text-xs text-yellow-500 mt-2">Connecting to server...</p>
+                <p id="connectionStatus" class="text-center text-xs text-yellow-500 mt-2">Connecting...</p>
             </div>
         </div>
 
-        <!-- Waiting Room Overlay -->
+        <!-- Waiting Room -->
         <div id="waitingRoom" class="absolute inset-0 z-40 bg-[#0f212e]/95 backdrop-blur hidden flex flex-col items-center justify-center">
             <div class="bg-[#1a2c38] p-8 rounded-2xl border border-[#2f4553] shadow-2xl w-full max-w-lg text-center">
                 <h2 class="text-2xl font-bold text-white mb-2">Waiting for Players</h2>
@@ -184,20 +167,14 @@
                     <p class="text-gray-500 text-xs uppercase mb-1">Room Code</p>
                     <p id="waitingRoomCode" class="text-4xl font-mono font-bold text-[#00e701] tracking-widest select-all"></p>
                 </div>
-                
                 <div class="text-left mb-6">
                     <p class="text-gray-400 text-xs font-bold mb-2 uppercase">Players Joined:</p>
                     <ul id="playerList" class="space-y-2"></ul>
                 </div>
-
                 <div id="hostControls" class="hidden">
-                    <button onclick="hostStartGame()" class="w-full bg-[#00e701] hover:bg-[#00c201] text-black font-bold py-3 rounded-lg shadow-lg uppercase tracking-wide">
-                        Start Game
-                    </button>
+                    <button onclick="hostStartGame()" class="w-full bg-[#00e701] hover:bg-[#00c201] text-black font-bold py-3 rounded-lg shadow-lg uppercase tracking-wide">Start Game</button>
                 </div>
-                <div id="clientControls">
-                    <p class="text-gray-500 text-sm animate-pulse">Waiting for host to start...</p>
-                </div>
+                <div id="clientControls"><p class="text-gray-500 text-sm animate-pulse">Waiting for host...</p></div>
             </div>
         </div>
 
@@ -215,13 +192,7 @@
             </div>
 
             <!-- Community Cards -->
-            <div id="communityArea" class="flex justify-center gap-2 md:gap-4 h-[90px] md:h-[120px]">
-                <div class="community-card-slot"></div>
-                <div class="community-card-slot"></div>
-                <div class="community-card-slot"></div>
-                <div class="community-card-slot"></div>
-                <div class="community-card-slot"></div>
-            </div>
+            <div id="communityArea" class="flex justify-center gap-2 md:gap-4 h-[90px] md:h-[120px]"></div>
             
             <div id="handResult" class="h-8 text-xl font-bold text-white text-center text-shadow-glow opacity-0 transition-opacity"></div>
         </div>
@@ -231,9 +202,7 @@
             <div class="mb-2 flex items-center gap-2">
                 <div id="playerIndicator" class="w-3 h-3 rounded-full bg-gray-500"></div>
                 <span class="text-gray-400 text-xs font-bold tracking-wider">YOU</span>
-                <span id="playerHandName" class="text-[#00e701] font-mono text-xs"></span>
             </div>
-
             <div id="playerHand" class="flex justify-center gap-1 mb-4 h-[90px] md:h-[120px]"></div>
         </div>
 
@@ -262,12 +231,9 @@
 
     <script>
         // ================================================================
-        // CONNECT TO YOUR RENDER SERVER
+        // UPDATE THIS WITH YOUR RENDER URL
         // ================================================================
-        
         const socket = io('https://mppokerfiles.onrender.com'); 
-
-        // ================================================================
 
         let myUserId = null;
         let myRoomCode = null;
@@ -280,6 +246,7 @@
             viewCreate: document.getElementById('viewCreate'),
             viewJoin: document.getElementById('viewJoin'),
             playerNameInput: document.getElementById('playerNameInput'),
+            startStackInput: document.getElementById('startStackInput'),
             roomCodeInput: document.getElementById('roomCodeInput'),
             lobbyStatus: document.getElementById('lobbyStatus'),
             connectionStatus: document.getElementById('connectionStatus'),
@@ -305,37 +272,21 @@
 
         // Socket Listeners
         socket.on('connect', () => {
-            console.log("Connected to server");
             myUserId = socket.id;
-            dom.connectionStatus.innerText = "Connected to Server";
+            dom.connectionStatus.innerText = "Connected";
             dom.connectionStatus.className = "text-center text-xs text-[#00e701] mt-2";
         });
         
-        socket.on('connect_error', (err) => {
-            dom.connectionStatus.innerText = "Connection Failed. Check URL.";
-            dom.connectionStatus.className = "text-center text-xs text-red-500 mt-2";
-        });
-
         socket.on('roomCreated', ({ roomCode, userId }) => {
             myRoomCode = roomCode;
             myUserId = userId;
-            dom.lobbyScreen.classList.add('hidden');
-            dom.waitingRoom.classList.remove('hidden');
-            dom.hostControls.classList.remove('hidden');
-            dom.clientControls.classList.add('hidden');
-            dom.roomCodeDisplay.innerText = roomCode;
-            dom.waitingRoomCode.innerText = roomCode;
+            showWaitingRoom(roomCode, true);
         });
 
         socket.on('joinedRoom', ({ roomCode, userId }) => {
             myRoomCode = roomCode;
             myUserId = userId;
-            dom.lobbyScreen.classList.add('hidden');
-            dom.waitingRoom.classList.remove('hidden');
-            dom.hostControls.classList.add('hidden');
-            dom.clientControls.classList.remove('hidden');
-            dom.roomCodeDisplay.innerText = roomCode;
-            dom.waitingRoomCode.innerText = roomCode;
+            showWaitingRoom(roomCode, false);
         });
 
         socket.on('gameState', (state) => {
@@ -348,7 +299,16 @@
             setTimeout(() => dom.lobbyStatus.innerText = "", 3000);
         });
 
-        // Actions
+        // Functions
+        function showWaitingRoom(code, isHost) {
+            dom.lobbyScreen.classList.add('hidden');
+            dom.waitingRoom.classList.remove('hidden');
+            if(isHost) dom.hostControls.classList.remove('hidden');
+            else dom.clientControls.classList.remove('hidden');
+            dom.roomCodeDisplay.innerText = code;
+            dom.waitingRoomCode.innerText = code;
+        }
+
         window.switchTab = (tab) => {
             if (tab === 'create') {
                 dom.viewCreate.classList.remove('hidden');
@@ -365,8 +325,9 @@
 
         window.createGame = () => {
             const name = dom.playerNameInput.value.trim();
+            const stack = dom.startStackInput.value;
             if(!name) return;
-            socket.emit('createRoom', { name });
+            socket.emit('createRoom', { name, startStack: stack });
         };
 
         window.joinGame = () => {
@@ -376,20 +337,18 @@
             socket.emit('joinRoom', { name, roomCode: code });
         };
 
-        window.hostStartGame = () => {
-            socket.emit('startGame', { roomCode: myRoomCode });
-        };
+        window.hostStartGame = () => socket.emit('startGame', { roomCode: myRoomCode });
 
         window.sendAction = (action) => {
             const amount = parseInt(dom.raiseSlider.value) || 0;
             socket.emit('action', { roomCode: myRoomCode, action, amount });
         };
 
-        // Render Logic
+        // SMART RENDER LOGIC
         function renderGame() {
             if (!gameState) return;
 
-            // Waiting Room
+            // 1. Handle Waiting Room
             if (gameState.status === 'waiting') {
                 dom.playerList.innerHTML = gameState.players.map(p => 
                     `<li class="bg-[#0f212e] p-2 rounded border border-[#2f4553] flex justify-between">
@@ -402,47 +361,56 @@
                 dom.waitingRoom.classList.add('hidden');
             }
 
-            // Game UI
             const myPlayer = gameState.players.find(p => p.id === myUserId);
-            
+            const isShowdown = (gameState.stage === 'showdown' || gameState.status === 'finished');
+
+            // 2. Info Bar
             dom.gamePhaseDisplay.innerText = gameState.stage.toUpperCase();
             dom.potDisplay.innerText = `$${gameState.pot}`;
             if(myPlayer) dom.balanceDisplay.innerText = `$${myPlayer.chips}`;
 
-            // Opponents
-            dom.opponentsArea.innerHTML = '';
+            // 3. Render Opponents (Smart Update)
+            dom.opponentsArea.innerHTML = ''; // Full redraw is safer for layout, but we lose anims if not careful.
+            // Ideally we diff, but for simplicity we just render.
+            // If card needs flip, we handle logic here.
+            
             gameState.players.forEach((p, index) => {
                 if(p.id === myUserId) return; 
 
                 const isActive = (index === gameState.turnIndex);
                 const seat = document.createElement('div');
-                seat.className = `opponent-seat bg-[#1a2c38] border-2 ${isActive ? 'border-[#00e701] shadow-[0_0_15px_rgba(0,231,1,0.3)]' : 'border-[#2f4553]'} p-2 rounded-xl flex flex-col items-center min-w-[100px] relative transition-all`;
+                seat.className = `opponent-seat bg-[#1a2c38] border-2 ${isActive ? 'border-[#00e701] shadow-[0_0_15px_rgba(0,231,1,0.3)]' : 'border-[#2f4553]'} p-2 rounded-xl flex flex-col items-center min-w-[100px] relative transition-all mx-2`;
                 if(p.status === 'folded') seat.classList.add('opponent-folded');
                 
+                // Showdown Logic: Show cards if active & showdown
+                let cardHtml = '';
+                if(p.status === 'active' || (p.status === 'folded' && false)) {
+                    if (isShowdown && p.status !== 'folded') {
+                        // Reveal Cards!
+                        cardHtml = p.hand.map(c => createCardHtml(c)).join('');
+                    } else {
+                        // Backs
+                        cardHtml = `<div class="w-8 h-11 bg-[#2f4553] rounded border border-gray-400 card-back"></div><div class="w-8 h-11 bg-[#2f4553] rounded border border-gray-400 card-back"></div>`;
+                    }
+                }
+
                 seat.innerHTML = `
                     <div class="absolute -top-3 w-8 h-8 rounded-full bg-[#2f4553] border border-gray-600 flex items-center justify-center text-xs font-bold text-gray-300"><i class="fas fa-user"></i></div>
                     <div class="mt-4 text-xs font-bold text-gray-400">${p.name}</div>
                     <div class="font-mono text-[#00e701] text-xs">$${p.chips}</div>
-                    <div class="flex gap-1 mt-1 h-[40px] items-center justify-center">
-                        ${p.status === 'active' ? `<div class="w-8 h-11 bg-[#2f4553] rounded border border-gray-400 card-back"></div><div class="w-8 h-11 bg-[#2f4553] rounded border border-gray-400 card-back"></div>` : ''}
-                    </div>
+                    <div class="flex gap-1 mt-1 h-[40px] items-center justify-center">${cardHtml}</div>
                     ${p.bet > 0 ? `<div class="absolute -right-2 top-0 bg-yellow-600 text-white text-[10px] px-1 rounded-full font-mono">${p.bet}</div>` : ''}
                 `;
                 dom.opponentsArea.appendChild(seat);
             });
 
-            // Community Cards
-            dom.communityArea.innerHTML = '';
-            gameState.communityCards.forEach(card => dom.communityArea.appendChild(createCardEl(card)));
-            for(let i=gameState.communityCards.length; i<5; i++) {
-                dom.communityArea.appendChild(createPlaceholderSlot());
-            }
+            // 4. Smart Community Cards (Prevent Re-Animation)
+            updateCardContainer(dom.communityArea, gameState.communityCards);
 
-            // My Hand
+            // 5. My Hand
             if(myPlayer) {
-                dom.playerHand.innerHTML = '';
-                myPlayer.hand.forEach(card => dom.playerHand.appendChild(createCardEl(card)));
-                
+                updateCardContainer(dom.playerHand, myPlayer.hand);
+
                 const isMyTurn = (gameState.players.findIndex(p => p.id === myUserId) === gameState.turnIndex);
                 if(isMyTurn) {
                     dom.playerIndicator.classList.add('bg-[#00e701]', 'active-turn-indicator');
@@ -455,7 +423,7 @@
                 }
             }
             
-             // Winner Msg
+            // 6. Winner Message
             if (gameState.winnerMessage) {
                  dom.handResult.innerText = gameState.winnerMessage;
                  dom.handResult.style.opacity = '1';
@@ -464,45 +432,72 @@
             }
         }
 
-        // Helpers
+        // --- Helpers ---
         const SUIT_ICONS = { 'h': '♥', 'd': '♦', 'c': '♣', 's': '♠' };
         
-        function createCardEl(card) {
-            const el = document.createElement('div');
-            const isRed = card.suit === 'h' || card.suit === 'd';
-            el.className = `playing-card ${isRed ? 'suit-red' : 'suit-black'} animate-deal`;
-            el.innerHTML = `
-                <div class="text-left leading-none">${card.rank}<br><span class="text-xs">${SUIT_ICONS[card.suit]}</span></div>
-                <div class="card-center-suit">${SUIT_ICONS[card.suit]}</div>
-                <div class="text-right leading-none rotate-180">${card.rank}<br><span class="text-xs">${SUIT_ICONS[card.suit]}</span></div>
-            `;
-            return el;
+        // This function intelligently updates DOM to avoid flicker
+        function updateCardContainer(container, cardsData) {
+            // Remove extra cards
+            while (container.children.length > cardsData.length) {
+                container.removeChild(container.lastChild);
+            }
+
+            cardsData.forEach((card, index) => {
+                const cardId = `${card.rank}-${card.suit}`;
+                let existing = container.children[index];
+
+                // If no slot exists, create one
+                if (!existing) {
+                    const newCard = document.createElement('div');
+                    newCard.innerHTML = createCardHtml(card); // InnerHTML for styling
+                    // Apply class to outer div
+                    const isRed = card.suit === 'h' || card.suit === 'd';
+                    newCard.className = `playing-card ${isRed ? 'suit-red' : 'suit-black'} animate-deal`;
+                    newCard.dataset.id = cardId;
+                    container.appendChild(newCard);
+                } 
+                // If slot exists, check if data matches. If distinct, replace.
+                else if (existing.dataset.id !== cardId) {
+                    existing.innerHTML = createCardHtml(card);
+                    const isRed = card.suit === 'h' || card.suit === 'd';
+                    existing.className = `playing-card ${isRed ? 'suit-red' : 'suit-black'} animate-deal`;
+                    existing.dataset.id = cardId;
+                }
+                // If matches, DO NOTHING (Sanitation preserved)
+            });
+
+            // Fill placeholders if needed (for community)
+            if(container === dom.communityArea) {
+                 while(container.children.length < 5) {
+                    const slot = document.createElement('div');
+                    slot.className = 'community-card-slot';
+                    container.appendChild(slot);
+                 }
+            }
         }
 
-        function createPlaceholderSlot() {
-            const slot = document.createElement('div');
-            slot.className = 'community-card-slot';
-            return slot;
+        function createCardHtml(card) {
+            return `
+                <div class="text-left leading-none pointer-events-none">${card.rank}<br><span class="text-xs">${SUIT_ICONS[card.suit]}</span></div>
+                <div class="card-center-suit pointer-events-none">${SUIT_ICONS[card.suit]}</div>
+                <div class="text-right leading-none rotate-180 pointer-events-none">${card.rank}<br><span class="text-xs">${SUIT_ICONS[card.suit]}</span></div>
+            `;
         }
 
         function enableControls(me) {
             dom.turnControls.classList.remove('opacity-50', 'pointer-events-none');
             dom.actionButtons.classList.remove('opacity-50', 'pointer-events-none');
-            
             const cost = gameState.currentBet - me.bet;
             dom.btnCheckCall.innerText = cost === 0 ? "Check" : `Call ${cost}`;
             dom.btnCheckCall.onclick = () => sendAction(cost === 0 ? 'check' : 'call');
-            
             dom.raiseSlider.max = me.chips;
             dom.raiseAmountDisplay.innerText = `$${dom.raiseSlider.value}`;
             dom.raiseSlider.oninput = (e) => dom.raiseAmountDisplay.innerText = `$${e.target.value}`;
         }
-
         function disableControls() {
             dom.turnControls.classList.add('opacity-50', 'pointer-events-none');
             dom.actionButtons.classList.add('opacity-50', 'pointer-events-none');
         }
-
     </script>
 </body>
 </html>
