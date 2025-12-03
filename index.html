@@ -11,22 +11,14 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         :root { --stake-dark: #0f212e; --stake-card: #1a2c38; --stake-green: #00e701; --card-width: 65px; --card-height: 90px; }
         body { font-family: 'Inter', sans-serif; background-color: var(--stake-dark); color: white; overflow-x: hidden; user-select: none; }
-        
         @media (min-width: 768px) { :root { --card-width: 90px; --card-height: 126px; } }
-
-        .playing-card {
-            width: var(--card-width); height: var(--card-height); background: white; border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.4); display: flex; flex-direction: column; justify-content: space-between;
-            padding: 6px; position: relative; font-weight: bold; font-size: 1.1rem; transition: transform 0.2s;
-        }
+        .playing-card { width: var(--card-width); height: var(--card-height); background: white; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); display: flex; flex-direction: column; justify-content: space-between; padding: 6px; position: relative; font-weight: bold; font-size: 1.1rem; transition: transform 0.2s; }
         .suit-red { color: #e91e63; } .suit-black { color: #2d3436; }
         .card-back { background: linear-gradient(135deg, #1a2c38 25%, #2c3e50 100%); border: 2px solid #fff; }
         .card-center-suit { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2.2rem; opacity: 0.15; }
-        
         .active-turn { border: 3px solid #00e701; box-shadow: 0 0 15px rgba(0,231,1,0.3); transform: scale(1.05); }
         .opponent-seat { background: #1a2c38; border: 1px solid #2f4553; border-radius: 12px; transition: all 0.3s; min-width: 110px; }
         .opponent-folded { opacity: 0.5; filter: grayscale(1); }
-        
         .community-card-slot { width: var(--card-width); height: var(--card-height); border: 2px dashed #2f4553; border-radius: 8px; }
         .btn-action { transition: all 0.1s; } .btn-action:active { transform: translateY(2px); }
         .animate-pop { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.27); }
@@ -34,6 +26,23 @@
     </style>
 </head>
 <body class="h-screen flex flex-col bg-[#0f212e]">
+
+    <!-- NOTIFICATION TOAST -->
+    <div id="notificationToast" class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-[#00e701] text-black font-bold px-6 py-3 rounded-full shadow-2xl z-50 transition-all duration-500 opacity-0 translate-y-[-20px]">
+        Action Notification
+    </div>
+
+    <!-- VOTE MODAL -->
+    <div id="voteModal" class="fixed inset-0 z-[60] bg-black/80 backdrop-blur flex items-center justify-center hidden">
+        <div class="bg-[#1a2c38] p-6 rounded-2xl border border-[#00e701] shadow-[0_0_30px_rgba(0,231,1,0.3)] w-full max-w-sm text-center">
+            <h3 class="text-xl font-bold text-white mb-2">Buy-In Request</h3>
+            <p class="text-gray-400 mb-6">Allow <span id="voteRequesterName" class="text-[#00e701] font-bold">Player</span> to buy back in?</p>
+            <div class="flex gap-4">
+                <button onclick="castVote(true)" class="flex-1 bg-[#00e701] text-black font-bold py-3 rounded hover:bg-[#00c201]">YES</button>
+                <button onclick="castVote(false)" class="flex-1 bg-[#2f4553] text-white font-bold py-3 rounded hover:bg-[#3d5565]">NO</button>
+            </div>
+        </div>
+    </div>
 
     <nav class="h-16 bg-[#1a2c38] flex items-center justify-between px-6 shadow-xl z-20 shrink-0 border-b border-[#2f4553]">
         <div class="font-black text-xl tracking-tighter italic flex items-center gap-2">
@@ -106,6 +115,14 @@
         </div>
 
         <div class="w-full flex flex-col items-center z-10 mb-2">
+            <!-- BUSTED / BUY IN STATE -->
+            <div id="bustedControls" class="hidden mb-4 animate-pop">
+                <button onclick="requestBuyIn()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-8 rounded-full shadow-[0_0_20px_rgba(239,68,68,0.5)] uppercase tracking-wide animate-pulse">
+                    <i class="fas fa-coins mr-2"></i> Request Buy-In
+                </button>
+                <p class="text-xs text-gray-500 text-center mt-2">Requires majority vote</p>
+            </div>
+
             <div class="mb-3 flex flex-col items-center gap-1">
                 <div class="flex items-center gap-2 bg-[#1a2c38] px-3 py-1 rounded-full border border-[#2f4553]">
                     <span class="text-gray-400 text-[10px] font-bold uppercase">Your Hand</span>
@@ -147,14 +164,29 @@
         let gameState = null;
         const dom = {}; 
 
-        // Map IDs to dom object
-        ['lobbyScreen','waitingRoom','viewCreate','viewJoin','playerNameInput','startStackInput','roomCodeInput','lobbyStatus','roomCodeDisplay','waitingRoomCode','playerList','btnStartGame','msgWaiting','opponentsArea','playerHand','communityArea','potDisplay','balanceDisplay','gamePhaseDisplay','turnControls','actionButtons','btnCheckCall','raiseSlider','raiseAmountDisplay','handResult','playerHandName'].forEach(id => dom[id] = document.getElementById(id));
+        ['lobbyScreen','waitingRoom','viewCreate','viewJoin','playerNameInput','startStackInput','roomCodeInput','lobbyStatus','roomCodeDisplay','waitingRoomCode','playerList','btnStartGame','msgWaiting','opponentsArea','playerHand','communityArea','potDisplay','balanceDisplay','gamePhaseDisplay','turnControls','actionButtons','btnCheckCall','raiseSlider','raiseAmountDisplay','handResult','playerHandName','bustedControls','voteModal','voteRequesterName','notificationToast'].forEach(id => dom[id] = document.getElementById(id));
 
         socket.on('connect', () => myUserId = socket.id);
         socket.on('roomCreated', ({ roomCode, userId }) => { myRoomCode = roomCode; myUserId = userId; showWaitingRoom(roomCode, true); });
         socket.on('joinedRoom', ({ roomCode, userId }) => { myRoomCode = roomCode; myUserId = userId; showWaitingRoom(roomCode, false); });
         socket.on('gameState', (state) => { gameState = state; renderGame(); });
         socket.on('error', (msg) => { dom.lobbyStatus.innerText = msg; setTimeout(() => dom.lobbyStatus.innerText="", 3000); });
+
+        // NOTIFICATIONS
+        socket.on('notification', (msg) => {
+            dom.notificationToast.innerText = msg;
+            dom.notificationToast.classList.remove('opacity-0', 'translate-y-[-20px]');
+            setTimeout(() => dom.notificationToast.classList.add('opacity-0', 'translate-y-[-20px]'), 4000);
+        });
+
+        // VOTING EVENTS
+        socket.on('startVote', ({ name, requesterId }) => {
+            dom.voteRequesterName.innerText = name;
+            dom.voteModal.classList.remove('hidden');
+        });
+        socket.on('endVote', () => {
+            dom.voteModal.classList.add('hidden');
+        });
 
         function showWaitingRoom(code, isHost) {
             dom.lobbyScreen.classList.add('hidden');
@@ -176,10 +208,16 @@
         window.joinGame = () => socket.emit('joinRoom', { name: dom.playerNameInput.value, roomCode: dom.roomCodeInput.value });
         window.hostStartGame = () => socket.emit('startGame', { roomCode: myRoomCode });
         window.sendAction = (action) => socket.emit('action', { roomCode: myRoomCode, action, amount: parseInt(dom.raiseSlider.value) });
+        
+        // Voting Functions
+        window.requestBuyIn = () => socket.emit('requestBuyIn', { roomCode: myRoomCode });
+        window.castVote = (vote) => {
+            socket.emit('castVote', { roomCode: myRoomCode, vote });
+            dom.voteModal.classList.add('hidden'); // Hide immediately after voting
+        };
 
         // --- RENDER LOGIC ---
         const SUIT_ICONS = { 'h': '♥', 'd': '♦', 'c': '♣', 's': '♠' };
-        const RANK_VALS = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
 
         function renderGame() {
             if (!gameState) return;
@@ -196,6 +234,13 @@
             dom.gamePhaseDisplay.innerText = gameState.stage.toUpperCase();
             dom.potDisplay.innerText = `$${gameState.pot}`;
             if(me) dom.balanceDisplay.innerText = `$${me.chips}`;
+
+            // Handle Busted State
+            if (me && me.chips <= 0) {
+                dom.bustedControls.classList.remove('hidden');
+            } else {
+                dom.bustedControls.classList.add('hidden');
+            }
 
             // Render Opponents
             dom.opponentsArea.innerHTML = '';
